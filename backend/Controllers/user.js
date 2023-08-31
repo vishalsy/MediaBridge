@@ -157,9 +157,10 @@ exports.updateprofile = async (req, res) => {
 exports.deletemyprofile = async (req, res) => {
 	try {
 		const user = await User.findById(req.user._id);
-
 		const posts = user.posts;
-
+		const followers = user.follower;
+		const followings=user.following;
+        const userID=user._id;
 		user.deleteOne();
 
 		// logout
@@ -174,7 +175,25 @@ exports.deletemyprofile = async (req, res) => {
 			const post = await Post.findById(posts[i]);
 			await post.deleteOne();
 		}
-		console.log("hello");
+
+
+		//removing user from followers following
+
+		for (let i = 0; i < followers.length; i++) {
+			const Follower = await User.findById(followers[i]);
+			const index = Follower.following.indexOf(userID);
+			Follower.following.splice(index, 1);
+			await Follower.save();
+		}
+        
+		//removing user from followings follower
+
+		for (let i = 0; i < followings.length; i++) {
+			const Follows = await User.findById(followings[i]);
+			const index = Follows.follower.indexOf(userID);
+			Follows.follower.splice(index, 1);
+			await Follows.save();
+		}
 
 		res.status(200).json({
 			success: true,
@@ -235,3 +254,62 @@ exports.follower = async (req, res) => {
 		});
 	}
 };
+
+
+exports.myprofile=async (req,res)=>{
+	try {
+
+		const user =await User.findById(req.user._id).populate("posts");
+		res.status(200).json({
+			success:true,
+			user,
+		});
+		
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+}
+
+exports.getuserprofile=async (req,res)=>{
+	try {
+
+		const user =await User.findById(req.params.id).populate("posts");
+		if(!user){
+			res.status(400).json({
+				success: false,
+				message: "user not found",
+			});
+		}
+		res.status(200).json({
+			success:true,
+			user,
+		});
+		
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+}
+
+
+exports.getallusers=async (req,res)=>{
+	try {
+
+		const users =await User.find();
+		res.status(200).json({
+			success:true,
+			users,
+		});
+		
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+}

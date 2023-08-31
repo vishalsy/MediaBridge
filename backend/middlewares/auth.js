@@ -3,20 +3,19 @@ const jwt=require("jsonwebtoken");
 
 exports.isAuthenticated=async (req,res,next)=>{
    try {
-    console.log("hello");   
     const {token}=req.cookies;
     if(!token){
         return res.status(401).json({
              message:"please login first"
         })
     }
-    
-   const decoded=await jwt.verify(token,process.env.JWT_SECRET) ;
+
+    const decoded=await jwt.verify(token,process.env.JWT_SECRET) ;
    
-   req.user=await User.findById(decoded._id);
-   next();
+    req.user=await User.findById(decoded._id);
+    next();
     
-   } catch (error) {
+    } catch (error) {
     res.status(500).json({
         message:error.message,
     })

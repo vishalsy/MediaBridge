@@ -14,10 +14,9 @@ exports.createPost = async (req, res) => {
 		const post = await Post.create(newPostData);
 		const user = await User.findById(req.user._id);
 
-		// console.log("how are you");
 		user.posts.push(post._id);
 
-		// console.log("hello");
+	
 		await user.save();
 		res.status(201).json({
 			success: true,
@@ -43,7 +42,6 @@ exports.deletepost = async (req, res) => {
 				message: "Post not found",
 			});
 		}
-		console.log("hello");
 
 		if (post.owner.toString() != req.user._id.toString()) {
 			return res.status(401).json({
