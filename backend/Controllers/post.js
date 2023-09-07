@@ -16,7 +16,6 @@ exports.createPost = async (req, res) => {
 
 		user.posts.push(post._id);
 
-	
 		await user.save();
 		res.status(201).json({
 			success: true,
@@ -109,67 +108,158 @@ exports.likedAndUnlikedPost = async (req, res) => {
 
 //............................................................................................................//
 
-
-
-exports.getPostoffollowing=async (req,res)=>{
-
-    try {
-		const user =await User.findById(req.user._id);
-		const post=await Post.find({
-			owner:
-			{
-				$in:user.following,
-			}
-		})
+exports.getPostoffollowing = async (req, res) => {
+	try {
+		const user = await User.findById(req.user._id);
+		const post = await Post.find({
+			owner: {
+				$in: user.following,
+			},
+		});
 
 		res.status(200).json({
-			success:true,
+			success: true,
 			post,
-		})
-
-
-
+		});
 	} catch (error) {
 		res.status(500).json({
 			success: false,
 			message: error.message,
 		});
 	}
+};
 
-
-}
-
-
-exports.updatecaption= async (req,res)=>{
+exports.updatecaption = async (req, res) => {
 	try {
-		const post= await Post.findById(req.params.id);
-		if(!post){
+		const post = await Post.findById(req.params.id);
+		if (!post) {
 			res.status(401).json({
 				success: false,
 				message: "post not found",
 			});
 		}
 
-		if(post.owner.toString()!==req.user._id.toString()){
+		if (post.owner.toString() !== req.user._id.toString()) {
 			res.status(500).json({
 				success: false,
 				message: "unortharised",
 			});
 		}
-        
-		post.caption=req.body.caption;
+
+		post.caption = req.body.caption;
 		await post.save();
 		res.status(200).json({
-			success:true,
-			message:"caption updated"
-		})
-
-
-
+			success: true,
+			message: "caption updated",
+		});
 	} catch (error) {
 		res.status(500).json({
 			success: false,
 			message: error.message,
 		});
 	}
-}
+};
+
+//.............................................................................................................//
+
+exports.commentonpost = async (req, res) => {
+	try {
+		const post = await Post.findById(req.params.id);
+
+		if (!post) {
+			return res.status(404).json({
+				success: false,
+				message: "post not found",
+			});
+		}
+		let commentindex = -1;
+
+		post.Comments.forEach((item, index) => {
+			if (item.user.toString() === req.user._id.toString()) {
+				commentindex = index;
+			}
+		});
+		if (commentindex != -1) {
+			post.Comments[commentindex].Comment = req.body.comment;
+
+			await post.save();
+			return res.status(200).json({
+				success: true,
+				message: "comments updated",
+			});
+		} else {
+			post.Comments.push({
+				user: req.user._id,
+				Comment: req.body.comment,
+			});
+			await post.save();
+			return res.status(200).json({
+				success: true,
+				message: "comments added",
+			});
+		}
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+
+exports.deletecomment = async (req, res) => {
+	try {
+		const post = await Post.findById(req.params.id);
+		
+		if (!post) {
+			return res.status(404).json({
+				success: false,
+				message: "post not found",
+			});
+		}
+	
+    //checking if owner wants to delete
+		if (post.owner.toString()===req.user._id.toString()) {
+			// console.log("ram");
+			if(req.body.commentid===undefined){
+				return res.status(500).json({
+					success:false,
+					message:"provide comment id"
+				})
+			}
+			// console.log("shyam");
+			
+			post.Comments.forEach((item, index) => {
+				if (item._id.toString() === req.body.commentid.toString()) {
+					return post.Comments.splice(index,1);
+				}
+			});
+
+			await post.save();
+
+			return res.status(200).json({
+				success: true,
+				message: "selected comment deleted",
+			});
+
+		} else {
+			post.Comments.forEach((item, index) => {
+				if (item.user.toString() === req.user._id.toString()) {
+					return post.Comments.splice(index,1);
+				}
+			});
+
+				await post.save();
+				return res.status(200).json({
+					success: true,
+					message: "Your comment deleted",
+				});
+		}
+		
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};

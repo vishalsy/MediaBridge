@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
-const bcrypt=require("bcrypt");
-const jwt=require("jsonwebtoken");
-
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
 const UserSchema = new mongoose.Schema({
 	name: {
@@ -23,7 +23,7 @@ const UserSchema = new mongoose.Schema({
 		required: [true, "please enter a password"],
 		minlength: [6, "password must be at least 6 characters"],
 		select: false,
-	},	
+	},
 
 	posts: [
 		{
@@ -44,27 +44,34 @@ const UserSchema = new mongoose.Schema({
 			ref: "User",
 		},
 	],
-}); 
+
+	resetPasswordToken: String,
+	resetPasswordExpire: Date,
+});
 
 //schema
 
-UserSchema.pre("save",async function(next){
-	if(this.isModified("password")){
-		this.password=await bcrypt.hash(this.password,10);
+UserSchema.pre("save", async function (next) {
+	if (this.isModified("password")) {
+		this.password = await bcrypt.hash(this.password, 10);
 	}
 	next();
-})
+});
 
+UserSchema.methods.matchPassword = async function (password) {
+	return await bcrypt.compare(password, this.password);
+};
 
-UserSchema.methods.matchPassword=async function(password){
-   return await bcrypt.compare(password,this.password);
-}
+UserSchema.methods.generateToken = function () {
+	return jwt.sign({ _id: this._id }, process.env.JWT_SECRET);
+};
 
-
-UserSchema.methods.generateToken=function(){
-	// console.log("hallo");
-   return jwt.sign({_id: this._id},process.env.JWT_SECRET); 
-}
-
+UserSchema.methods.getResetPasswordToken = function () {
+	const resettoken = crypto.randomBytes(20).toString("hex");
+   console.log(resettoken);
+	this.resetPasswordToken = crypto.createHash("sha256").update(resettoken).digest("hex");
+	this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+	return resettoken;
+};
 
 module.exports = mongoose.model("User", UserSchema); //model

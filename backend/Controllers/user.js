@@ -1,5 +1,7 @@
 const Post = require("../models/Post");
 const User = require("../models/User");
+const { sendemail } = require("../middlewares/sendemail");
+const crypto = require("crypto");
 
 exports.registor = async (req, res) => {
 	try {
@@ -23,7 +25,7 @@ exports.registor = async (req, res) => {
 
 		const options = {
 			expires: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-			httpOnly: true,
+			httpOnly: true, //When httpOnly is set to true, it means that the cookie is only accessible to the server, and JavaScript running on the client cannot read or modify it. This is a security measure to help prevent certain types of cross-site scripting (XSS) attacks.
 		};
 
 		res.status(201).cookie("token", token, options).json({
@@ -159,8 +161,8 @@ exports.deletemyprofile = async (req, res) => {
 		const user = await User.findById(req.user._id);
 		const posts = user.posts;
 		const followers = user.follower;
-		const followings=user.following;
-        const userID=user._id;
+		const followings = user.following;
+		const userID = user._id;
 		user.deleteOne();
 
 		// logout
@@ -176,7 +178,6 @@ exports.deletemyprofile = async (req, res) => {
 			await post.deleteOne();
 		}
 
-
 		//removing user from followers following
 
 		for (let i = 0; i < followers.length; i++) {
@@ -185,7 +186,7 @@ exports.deletemyprofile = async (req, res) => {
 			Follower.following.splice(index, 1);
 			await Follower.save();
 		}
-        
+
 		//removing user from followings follower
 
 		for (let i = 0; i < followings.length; i++) {
@@ -255,61 +256,143 @@ exports.follower = async (req, res) => {
 	}
 };
 
-
-exports.myprofile=async (req,res)=>{
+exports.myprofile = async (req, res) => {
 	try {
-
-		const user =await User.findById(req.user._id).populate("posts");
+		const user = await User.findById(req.user._id).populate("posts");
 		res.status(200).json({
-			success:true,
+			success: true,
 			user,
 		});
-		
 	} catch (error) {
 		res.status(500).json({
 			success: false,
 			message: error.message,
 		});
 	}
-}
+};
 
-exports.getuserprofile=async (req,res)=>{
+exports.getuserprofile = async (req, res) => {
 	try {
-
-		const user =await User.findById(req.params.id).populate("posts");
-		if(!user){
+		const user = await User.findById(req.params.id).populate("posts");
+		if (!user) {
 			res.status(400).json({
 				success: false,
 				message: "user not found",
 			});
 		}
 		res.status(200).json({
-			success:true,
+			success: true,
 			user,
 		});
-		
 	} catch (error) {
 		res.status(500).json({
 			success: false,
 			message: error.message,
 		});
 	}
-}
+};
 
-
-exports.getallusers=async (req,res)=>{
+exports.getallusers = async (req, res) => {
 	try {
-
-		const users =await User.find();
+		const users = await User.find();
 		res.status(200).json({
-			success:true,
+			success: true,
 			users,
 		});
-		
 	} catch (error) {
 		res.status(500).json({
 			success: false,
 			message: error.message,
 		});
 	}
-}
+};
+
+exports.forgotpassword = async (req, res) => {
+	try {
+		const user = await User.findOne({ email: req.body.email });
+		if (!user) {
+			return res.status(404).json({
+				success: false,
+				message: "User not found",
+			});
+		}
+
+		const resetPasswordtoken = user.getResetPasswordToken();
+
+		await user.save();
+
+		const resetUrl = `${req.protocol}://${req.get(
+			"host"
+		)}/api/v1/password/reset/${resetPasswordtoken}`;
+
+		const message = `Reset Your password by clicking on the link below: ${resetUrl}`;
+
+		try {
+			await sendemail({
+				email: user.email,
+				subject: "Reset Password",
+				message,
+			});
+
+			res.status(200).json({
+				success: true,
+				message: `mail sent to ${user.email}`,
+			});
+		} catch (error) {
+			user.resetPasswordToken = undefined;
+			user.resetPasswordExpire = undefined;
+			await user.save();
+
+			res.status(500).json({
+				success: false,
+				message: error.message,
+			});
+		}
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+exports.resetPassword = async (req, res) => {
+	try {
+		const resetpasswordtoken = crypto
+			.createHash("sha256")
+			.update(req.params.token)
+			.digest("hex");
+
+		console.log(resetpasswordtoken);
+		
+
+		const user = await User.findOne({
+			resetpasswordtoken,
+			resetPasswordExpire: { $gt: Date.now() },
+		});
+		
+		console.log(user);
+
+		if (!user) {
+			return res.status(401).json({
+				success: false,
+				message: "token invalid or has expire",
+			});
+		}
+		user.password = req.body.password;
+
+		user.resetPasswordToken = inavlid;
+		user.resetPasswordExpire = inavlid;
+		await user.save();
+
+		return res.status(200).json({
+			success: true,
+			message: "password has been reset",
+		});
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
